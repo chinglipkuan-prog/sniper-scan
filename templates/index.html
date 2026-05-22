@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股狙击扫描器</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SniperScan">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/static/icon-512.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background: #050508;
+    color: #e2e8f0;
+    min-height: 100vh;
+}
+.orbitron { font-family: 'Orbitron', sans-serif; }
+.neon-cyan { text-shadow: 0 0 10px rgba(6,182,212,.8), 0 0 20px rgba(6,182,212,.4); }
+.neon-pink { text-shadow: 0 0 10px rgba(236,72,153,.8), 0 0 20px rgba(236,72,153,.4); }
+.neon-box { box-shadow: 0 0 15px rgba(6,182,212,.15); border: 1px solid rgba(6,182,212,.3); }
+.neon-box-green { box-shadow: 0 0 15px rgba(52,211,153,.15); border: 1px solid rgba(52,211,153,.3); }
+.neon-box-red { box-shadow: 0 0 15px rgba(251,113,133,.15); border: 1px solid rgba(251,113,133,.3); }
+.glass { background: rgba(15,23,42,.6); backdrop-filter: blur(12px); }
+
+.stock-row {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 12px;
+}
+.stock-row:hover {
+    background: rgba(30,41,59,.8);
+    transform: translateX(4px);
+}
+.stock-row:active { transform: scale(0.98); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #00FFFF; }
+
+/* Loading spinner */
+.spinner {
+    width: 24px; height: 24px;
+    border: 3px solid rgba(6,182,212,.2);
+    border-top: 3px solid #00FFFF;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease-out; }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,.7);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+}
+.modal-content {
+    background: #0f172a;
+    border: 1px solid rgba(6,182,212,.3);
+    border-radius: 20px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.score-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: #1e293b;
+    overflow: hidden;
+}
+.score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    background: #0f172a;
+    border: 1px solid rgba(6,182,212,.3);
+    border-radius: 12px;
+    z-index: 40;
+    max-height: 360px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+    .modal-content { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-30 glass border-b border-slate-800/80 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-pink-500 flex items-center justify-center orbitron text-xs font-bold">S</div>
+            <div>
+                <h1 class="orbitron text-lg font-bold text-cyan-400 neon-cyan">SNIPER SCAN</h1>
+                <p class="text-[10px] text-slate-500 -mt-0.5">基于知识库的美股实时扫描器</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="scanTime" class="text-[11px] text-slate-500 hidden sm:inline"></span>
+            <button id="refreshBtn" onclick="refreshScan()" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-900/30 border border-cyan-500/30 text-cyan-400 text-sm font-bold hover:bg-cyan-800/40 transition-all active:scale-95">
+                <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                刷新数据
+            </button>
+        </div>
+    </div>
+</header>
+
+<main class="pt-20 pb-8 px-4 max-w-7xl mx-auto">
+
+<!-- Status Bar -->
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-2 text-xs text-slate-500">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span id="statusText" class="text-slate-400">就绪</span>
+        <span class="text-slate-600">|</span>
+        <span id="stockCount" class="text-slate-500">扫描中...</span>
+    </div>
+    <div class="text-[10px] text-slate-600">
+        <span id="updateIndicator">实时数据 <span id="lastUpdate">—</span></span>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="relative mb-6" id="searchContainer">
+    <div class="flex gap-2">
+        <div class="flex-1 relative">
+            <input
+                id="searchInput"
+                type="text"
+                placeholder="🔍 搜索股票名称或代码 (如 AMD、特斯拉、AAPL)..."
+                class="w-full px-5 py-3.5 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-slate-200 text-sm placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                autocomplete="off"
+            />
+            <div id="searchResults" class="search-results hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content: Two Columns -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- ========== 做多 BUY Column ========== -->
+    <div>
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 rounded-xl bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
+            </div>
+            <h2 class="text-lg font-bold text-emerald-400">做多排行榜 <span class="text-xs text-slate-500 font-normal">TOP 10</span></h2>
+        </div>
+        <div id="buyList" class="space-y-2">
+            <div class="text-center py-12 text-slate-600"><div class="spinner mx-auto mb-2"></div><span class="text-sm">加载中...</span></div>
+        </div>
+    </div>
+
+    <!-- ========== 做空 SELL Column ========== -->
+    <div>
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 rounded-xl bg-rose-900/40 border border-rose-500/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+            <h2 class="text-lg font-bold text-rose-400">做空排行榜 <span class="text-xs text-slate-500 font-normal">TOP 10</span></h2>
+        </div>
+        <div id="sellList" class="space-y-2">
+            <div class="text-center py-12 text-slate-600"><div class="spinner mx-auto mb-2"></div><span class="text-sm">加载中...</span></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Footer -->
+<div class="mt-8 text-center text-[10px] text-slate-700">
+    <span class="orbitron">SNIPER SCAN v1.0</span> — 基于《短线交易大师》《短线狙击手》《股票K线炼金术》《盘口》《同花顺实战精要》
+</div>
+
+</main>
+
+<!-- ===== DETAIL MODAL ===== -->
+<div id="detailModal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+    <div class="modal-content fade-in" id="modalBody">
+        <div class="text-center py-8 text-slate-600"><div class="spinner mx-auto mb-2"></div></div>
+    </div>
+</div>
+
+<script>
+// ========================
+// 全局状态
+// ========================
+let scanData = null;
+let isLoading = false;
+
+// ========================
+// 扫描函数
+// ========================
+async function refreshScan(force = true) {
+    if (isLoading) return;
+    isLoading = true;
+
+    const btn = document.getElementById('refreshBtn');
+    const icon = document.getElementById('refreshIcon');
+    const statusText = document.getElementById('statusText');
+    const statusDot = document.getElementById('statusDot');
+
+    btn.disabled = true;
+    btn.classList.add('opacity-60');
+    icon.classList.add('animate-spin');
+    statusText.textContent = '扫描中...';
+    statusDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+
+    try {
+        const url = force ? `/api/scan?refresh=true` : `/api/scan`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        scanData = data;
+        renderBuys(data.buys);
+        renderSells(data.sells);
+
+        document.getElementById('stockCount').textContent = `已扫描 ${data.total_scanned} 只股票`;
+
+        const t = new Date(data.timestamp);
+        document.getElementById('lastUpdate').textContent = t.toLocaleTimeString('zh-CN', {hour12:false});
+        document.getElementById('scanTime').textContent = t.toLocaleString('zh-CN');
+
+        statusText.textContent = '就绪 ✓';
+        statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+    } catch (e) {
+        statusText.textContent = '扫描失败';
+        statusDot.className = 'w-2 h-2 rounded-full bg-rose-400';
+        console.error(e);
+    } finally {
+        isLoading = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-60');
+        icon.classList.remove('animate-spin');
+    }
+}
+
+// ========================
+// 渲染列表
+// ========================
+function renderBuys(stocks) {
+    const container = document.getElementById('buyList');
+    if (!stocks || stocks.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-slate-600">暂无推荐</div>';
+        return;
+    }
+    container.innerHTML = stocks.map((s, i) => renderStockCard(s, i, 'buy')).join('');
+}
+
+function renderSells(stocks) {
+    const container = document.getElementById('sellList');
+    if (!stocks || stocks.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-slate-600">暂无推荐</div>';
+        return;
+    }
+    container.innerHTML = stocks.map((s, i) => renderStockCard(s, i, 'sell')).join('');
+}
+
+function renderStockCard(s, idx, type) {
+    const scoreKey = type === 'buy' ? 'bullish_score' : 'bearish_score';
+    const color = type === 'buy' ? 'emerald' : 'rose';
+    const label = type === 'buy' ? '做多' : '做空';
+    const score = s[scoreKey] || 0;
+    const maxSignals = type === 'buy'
+        ? (s.bullish_signals || []).slice(0, 3).join(' · ')
+        : (s.bearish_signals || []).slice(0, 3).join(' · ');
+    const changeColor = s.change_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+    const changeIcon = s.change_pct >= 0 ? '▲' : '▼';
+
+    return `
+    <div class="stock-row p-4 bg-slate-900/40 border border-slate-800/60 neon-box" onclick="openDetail('${s.ticker}')">
+        <div class="flex items-start gap-3">
+            <!-- Rank + Score -->
+            <div class="flex flex-col items-center min-w-[44px]">
+                <span class="orbitron text-xs text-slate-500">#${idx+1}</span>
+                <div class="mt-1 w-10 h-10 rounded-xl bg-${color}-900/30 border border-${color}-500/30 flex items-center justify-center">
+                    <span class="orbitron text-lg font-black text-${color}-400">${score}</span>
+                </div>
+            </div>
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="orbitron text-sm font-bold text-slate-100">${s.ticker}</span>
+                    <span class="text-xs text-slate-400 truncate">${s.name}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-500">${s.sector}</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="orbitron text-2xl font-black text-slate-50">$${s.price.toFixed(2)}</span>
+                    <span class="orbitron text-sm font-bold ${changeColor}">${changeIcon} ${s.change_pct >= 0 ? '+' : ''}${s.change_pct.toFixed(2)}%</span>
+                </div>
+                <div class="mt-1.5 flex flex-wrap gap-1">
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">RSI ${s.rsi?.toFixed(0) || '—'}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">量 ${s.vol_ratio?.toFixed(1) || '—'}x</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">MA20 ${s.ma20_deviation >= 0 ? '+' : ''}${s.ma20_deviation?.toFixed(1) || '—'}%</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">${s.candle_pattern || '—'}</span>
+                </div>
+                ${maxSignals ? `<div class="mt-1 text-[11px] text-slate-500 truncate">${maxSignals}</div>` : ''}
+            </div>
+            <!-- Mini Chart Trigger -->
+            <div class="flex-shrink-0 self-center">
+                <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+        </div>
+        <!-- Score bar -->
+        <div class="mt-2 score-bar">
+            <div class="score-bar-fill bg-${color}-400" style="width:${score}%"></div>
+        </div>
+    </div>`;
+}
+
+// ========================
+// 详情弹窗
+// ========================
+async function openDetail(ticker) {
+    const modal = document.getElementById('detailModal');
+    const body = document.getElementById('modalBody');
+    modal.classList.remove('hidden');
+    body.innerHTML = '<div class="text-center py-8 text-slate-600"><div class="spinner mx-auto mb-2"></div><span class="text-sm">加载分析中...</span></div>';
+
+    try {
+        const res = await fetch(`/api/stock/${ticker}`);
+        const data = await res.json();
+
+        if (!data.found || !data.stock) {
+            body.innerHTML = `<div class="text-center py-8 text-rose-400">❌ 未找到 ${ticker} 的数据</div>`;
+            return;
+        }
+
+        const s = data.stock;
+        const color = s.direction === 'buy' ? 'emerald' : 'rose';
+        const dirLabel = s.direction === 'buy' ? '📈 建议做多 / Buy' : '📉 建议做空 / Sell';
+        const signals = s.direction === 'buy' ? s.bullish_signals : s.bearish_signals;
+        const score = s.direction === 'buy' ? s.bullish_score : s.bearish_score;
+        const oppScore = s.direction === 'buy' ? s.bearish_score : s.bullish_score;
+        const changeColor = s.change_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        const changeIcon = s.change_pct >= 0 ? '▲' : '▼';
+
+        // Build details HTML
+        let detailsHtml = '';
+        if (s.details && s.details.length > 0) {
+            const relevant = s.details.filter(d => {
+                const sigNames = signals || [];
+                return sigNames.some(sig => d.signal.includes(sig) ||
+                    (s.direction === 'buy' && (d.signal.includes('📈') || d.signal.includes('📊') || d.signal.includes('🔥') || d.signal.includes('⚡') || d.signal.includes('🕯️') || d.signal.includes('🎯') || d.signal.includes('🧹'))) ||
+                    (s.direction === 'sell' && (d.signal.includes('📉') || d.signal.includes('⚠️') || d.signal.includes('💀') || d.signal.includes('💧') || d.signal.includes('🕯️'))));
+            });
+            // If relevant filtering empty, show all
+            const toShow = relevant.length > 0 ? relevant : s.details;
+            detailsHtml = toShow.map(d => `
+                <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 mb-2">
+                    <div class="text-sm font-bold text-slate-200 mb-1">${d.signal}</div>
+                    <div class="text-xs text-slate-400 leading-relaxed">${d.reason}</div>
+                </div>
+            `).join('');
+        }
+
+        body.innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-${color}-900/50 to-slate-900 border border-${color}-500/40 flex items-center justify-center">
+                    <span class="orbitron text-lg font-black text-${color}-400">${s.ticker.substring(0,4)}</span>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-100">${s.ticker} <span class="text-sm text-slate-400 font-normal">${s.name}</span></h3>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-500">${s.sector}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-${color}-900/40 text-${color}-400 border border-${color}-500/30">${dirLabel}</span>
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition-all">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">现价</div>
+                <div class="orbitron text-2xl font-black text-slate-50">$${s.price.toFixed(2)}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">涨跌幅</div>
+                <div class="orbitron text-2xl font-black ${changeColor}">${changeIcon} ${s.change_pct >= 0 ? '+' : ''}${s.change_pct.toFixed(2)}%</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">做多评分</div>
+                <div class="orbitron text-lg font-bold text-emerald-400">${s.bullish_score}/100</div>
+                <div class="score-bar mt-1"><div class="score-bar-fill bg-emerald-400" style="width:${s.bullish_score}%"></div></div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">做空评分</div>
+                <div class="orbitron text-lg font-bold text-rose-400">${s.bearish_score}/100</div>
+                <div class="score-bar mt-1"><div class="score-bar-fill bg-rose-400" style="width:${s.bearish_score}%"></div></div>
+            </div>
+        </div>
+
+        <!-- Technical Metrics -->
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 mb-4">
+            <h4 class="text-xs font-bold text-cyan-400 mb-3 orbitron">TECHNICAL METRICS</h4>
+            <div class="grid grid-cols-3 gap-3 text-xs">
+                <div><span class="text-slate-500">RSI(14)</span><br><span class="font-bold text-slate-200 orbitron">${s.rsi?.toFixed(1) || '—'}</span></div>
+                <div><span class="text-slate-500">MACD</span><br><span class="font-bold ${s.macd_bullish ? 'text-emerald-400' : 'text-rose-400'} orbitron">${s.macd?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">MACD信号</span><br><span class="font-bold text-slate-200 orbitron">${s.macd_signal?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">MA5</span><br><span class="font-bold text-slate-200 orbitron">$${s.ma5?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">MA20</span><br><span class="font-bold text-slate-200 orbitron">$${s.ma20?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">MA50</span><br><span class="font-bold text-slate-200 orbitron">$${s.ma50?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">布林上轨</span><br><span class="font-bold text-rose-400 orbitron">$${s.boll_up?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">布林中轨</span><br><span class="font-bold text-amber-400 orbitron">$${s.boll_mid?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">布林下轨</span><br><span class="font-bold text-emerald-400 orbitron">$${s.boll_dn?.toFixed(2) || '—'}</span></div>
+                <div><span class="text-slate-500">成交量比</span><br><span class="font-bold text-slate-200 orbitron">${s.vol_ratio?.toFixed(1) || '—'}x</span></div>
+                <div><span class="text-slate-500">乖离率(MA20)</span><br><span class="font-bold orbitron ${s.ma20_deviation >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${s.ma20_deviation >= 0 ? '+' : ''}${s.ma20_deviation?.toFixed(1) || '—'}%</span></div>
+                <div><span class="text-slate-500">K线形态</span><br><span class="font-bold text-cyan-400">${s.candle_pattern || '—'}</span></div>
+            </div>
+        </div>
+
+        <!-- Analysis Details -->
+        <h4 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+            <span>📖 基于知识库的分析</span>
+            <span class="text-[10px] text-slate-500 font-normal">《短线狙击手》《K线炼金术》《同花顺》</span>
+        </h4>
+        ${detailsHtml || '<div class="text-xs text-slate-500 py-4 text-center">暂无详细分析信号</div>'}
+
+        <!-- Source Books Footer -->
+        <div class="mt-4 pt-3 border-t border-slate-700/50">
+            <div class="text-[10px] text-slate-600 leading-relaxed">
+                🧠 分析依据：<strong class="text-slate-500">《短线交易大师》</strong>趋势判定 | <strong class="text-slate-500">《短线狙击手》</strong>入场点策略 |
+                <strong class="text-slate-500">《股票K线炼金术》</strong>K线形态识别 | <strong class="text-slate-500">《盘口》</strong>量价关系 |
+                <strong class="text-slate-500">《同花顺实战精要》</strong>技术指标分析
+            </div>
+        </div>
+        `;
+
+    } catch (e) {
+        body.innerHTML = `<div class="text-center py-8 text-rose-400">❌ 加载失败: ${e.message}</div>`;
+    }
+}
+
+function closeModal() {
+    document.getElementById('detailModal').classList.add('hidden');
+}
+
+// ========================
+// 搜索功能
+// ========================
+let searchTimeout = null;
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const q = this.value.trim();
+    if (q.length < 1) {
+        searchResults.classList.add('hidden');
+        return;
+    }
+    searchTimeout = setTimeout(() => doSearch(q), 300);
+});
+
+async function doSearch(query) {
+    try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        const results = data.results || [];
+
+        if (results.length === 0) {
+            searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">未找到匹配的股票</div>';
+            searchResults.classList.remove('hidden');
+            return;
+        }
+
+        searchResults.innerHTML = results.map((r, i) => `
+            <div class="px-4 py-3 flex items-center gap-3 hover:bg-slate-800/60 cursor-pointer transition-all"
+                 onclick="handleSearchSelect('${r.ticker}')"
+                 style="animation: fadeIn 0.2s ease-out ${i * 0.03}s both">
+                <span class="orbitron text-sm font-bold text-cyan-400">${r.ticker}</span>
+                <span class="text-xs text-slate-400">${r.name}</span>
+            </div>
+        `).join('');
+        searchResults.classList.remove('hidden');
+    } catch (e) {
+        searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-rose-400">搜索失败</div>';
+        searchResults.classList.remove('hidden');
+    }
+}
+
+function handleSearchSelect(ticker) {
+    searchResults.classList.add('hidden');
+    searchInput.value = '';
+    openDetail(ticker);
+}
+
+// 点击外部关闭搜索
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('searchContainer');
+    if (!container.contains(e.target)) {
+        searchResults.classList.add('hidden');
+    }
+});
+
+// 回车搜索
+searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const q = this.value.trim().toUpperCase();
+        if (q) {
+            searchResults.classList.add('hidden');
+            openDetail(q);
+        }
+    }
+});
+
+// ========================
+// 键盘快捷键
+// ========================
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        refreshScan(true);
+    }
+});
+
+    // ========================
+// 注册 PWA Service Worker
+// ========================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    });
+}
+
+// ========================
+// 初始化
+// ========================
+document.addEventListener('DOMContentLoaded', () => {
+    refreshScan(false);
+    // Auto-refresh every 5 minutes
+    setInterval(() => refreshScan(false), 300000);
+});
+</script>
+</body>
+</html>
