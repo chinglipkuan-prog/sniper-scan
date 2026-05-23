@@ -35,23 +35,24 @@ HTML_DIR = Path(__file__).parent / "templates"
 
 
 def _run_scan():
-    """执行全市场扫描"""
-    batch_size = 20
+    """执行全市场扫描 — 并行版"""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     results = []
     total = len(SCAN_UNIVERSE)
+    BATCH = 40
 
-    for i in range(0, total, batch_size):
-        batch = SCAN_UNIVERSE[i:i + batch_size]
-        batch_results = []
-        for ticker in batch:
-            try:
-                r = compute_indicators(ticker)
-                if r:
-                    batch_results.append(r)
-            except Exception:
-                pass
-            time.sleep(0.15)  # yfinance 限速
-        results.extend(batch_results)
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        for i in range(0, total, BATCH):
+            batch = SCAN_UNIVERSE[i:i + BATCH]
+            futures = {pool.submit(compute_indicators, t): t for t in batch}
+            for f in as_completed(futures, timeout=45):
+                try:
+                    r = f.result(timeout=5)
+                    if r:
+                        results.append(r)
+                except Exception:
+                    pass
+            time.sleep(0.3)
 
     # 分类排名
     buys_all = sorted([r for r in results if r["direction"] == "buy"],
