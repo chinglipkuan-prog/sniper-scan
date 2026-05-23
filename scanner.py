@@ -35,7 +35,7 @@ SCAN_UNIVERSE = [
     # --- 金融/银行 ---
     "JPM", "GS", "MS", "BAC", "WFC", "C", "V", "MA", "AXP", "SCHW", "BLK",
     # --- 消费/零售 ---
-    "WMT", "COST", "HD", "LOW", "NKE", "SBUX", "MCD", "TGT", "DG", "DLTR", "CHWY", "AMZN",
+    "WMT", "COST", "HD", "LOW", "NKE", "SBUX", "MCD", "TGT", "DG", "DLTR", "CHWY",
     # --- 电信/媒体 ---
     "T", "VZ", "CMCSA", "DIS", "NFLX", "WBD", "LYV", "SPOT",
     # --- 能源 ---
@@ -43,9 +43,43 @@ SCAN_UNIVERSE = [
     # --- 工业/国防 ---
     "CAT", "BA", "GE", "HON", "MMM", "LMT", "RTX", "GD", "NOC",
     # --- 汽车/运输 ---
-    "F", "GM", "RIVN", "LCID", "NIO", "LI", "XPEV", "UBER", "DASH",
-    # --- ETF ---
-    "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "XLV", "XLI",
+    "F", "GM", "RIVN", "LCID", "NIO", "LI", "XPEV", "DASH",
+    # --- 网安 ---
+    "PANW", "CRWD", "FTNT", "ZS",
+    # --- 大数据/AI ---
+    "PLTR", "SOUND",
+    # --- 云计算/企服 ---
+    "WDAY", "TEAM",
+    # --- 消费饮料/食品 ---
+    "KO", "PEP", "PM", "EL", "YUM", "MDLZ",
+    # --- 零售 ---
+    "TJX", "ROST", "ORLY", "AZO", "TSCO",
+    # --- 医疗设备 ---
+    "ISRG", "MDT", "BSX", "SYK", "ZTS",
+    # --- 保险 ---
+    "BRK.B", "ALL", "MET", "PRU",
+    # --- 工业补充 ---
+    "CARR", "OTIS", "PWR", "CMI", "ITW",
+    # --- 航空 ---
+    "DAL", "UAL", "LUV",
+    # --- 新能源/清洁能源 ---
+    "ENPH", "FSLR", "NEE",
+    # --- 游戏/娱乐 ---
+    "EA", "TTWO", "ROKU",
+    # --- 物流/快递 ---
+    "FDX", "UPS",
+    # --- 电信 ---
+    "TMUS",
+    # --- 热门金融科技 ---
+    "HOOD", "SOFI", "AFRM",
+    # --- 半导体补充 ---
+    "TSM",
+    # --- 中概股补充 ---
+    "BILI", "TCOM",
+    # --- 其它重要 ---
+    "SONY", "CVS",
+    # --- ETF补充 ---
+    "VTI", "TLT", "GLD", "SLV", "KWEB",
 ]
 
 # 行业映射
@@ -67,6 +101,23 @@ SECTOR_MAP = {
     "CAT":"工业", "BA":"航空", "GE":"工业", "HON":"工业", "MMM":"工业", "LMT":"国防", "RTX":"国防", "GD":"国防", "NOC":"国防",
     "F":"汽车", "GM":"汽车", "RIVN":"电动车", "LCID":"电动车", "NIO":"电动车", "LI":"电动车", "XPEV":"电动车", "DASH":"外卖",
     "SPY":"大盘ETF", "QQQ":"科技ETF", "IWM":"小盘ETF", "DIA":"道指ETF", "XLF":"金融ETF", "XLE":"能源ETF", "XLK":"科技ETF", "XLV":"医疗ETF", "XLI":"工业ETF",
+    "TSM":"半导体", "PANW":"网安", "CRWD":"网安", "FTNT":"网安", "ZS":"网安",
+    "PLTR":"大数据", "SOUND":"AI",
+    "WDAY":"云计算", "TEAM":"企服",
+    "KO":"消费", "PEP":"消费", "PM":"消费", "EL":"消费", "YUM":"消费", "MDLZ":"消费",
+    "TJX":"零售", "ROST":"零售", "ORLY":"零售", "AZO":"零售", "TSCO":"零售",
+    "ISRG":"医疗设备", "MDT":"医疗设备", "BSX":"医疗设备", "SYK":"医疗设备", "ZTS":"医疗",
+    "BRK.B":"保险", "ALL":"保险", "MET":"保险", "PRU":"保险",
+    "CARR":"工业", "OTIS":"工业", "PWR":"工业", "CMI":"工业", "ITW":"工业",
+    "DAL":"航空", "UAL":"航空", "LUV":"航空",
+    "ENPH":"新能源", "FSLR":"新能源", "NEE":"电力",
+    "EA":"游戏", "TTWO":"游戏", "ROKU":"流媒体",
+    "FDX":"物流", "UPS":"物流",
+    "TMUS":"电信",
+    "HOOD":"金融科技", "SOFI":"金融科技", "AFRM":"金融科技",
+    "BILI":"互联网", "TCOM":"旅游",
+    "SONY":"消费电子", "CVS":"医药零售",
+    "VTI":"大盘ETF", "TLT":"国债ETF", "GLD":"商品ETF", "SLV":"商品ETF", "KWEB":"中概ETF",
 }
 
 # 中文名映射
@@ -84,6 +135,23 @@ CN_NAME_MAP = {
     "XOM":"埃克森美孚", "CVX":"雪佛龙", "CAT":"卡特彼勒", "BA":"波音", "GE":"通用电气",
     "MELI":"MercadoLibre", "SE":"Sea Limited", "RDDT":"Reddit", "ARM":"ARM Holdings",
     "LLY":"礼来", "UNH":"联合健康", "ABBV":"艾伯维", "JNJ":"强生",
+    "TSM":"台积电", "PANW":"Palo Alto", "CRWD":"CrowdStrike", "FTNT":"飞塔", "ZS":"Zscaler",
+    "PLTR":"Palantir", "SOUND":"SoundHound",
+    "WDAY":"Workday", "TEAM":"Atlassian",
+    "KO":"可口可乐", "PEP":"百事", "PM":"菲利普莫里斯", "EL":"雅诗兰黛", "YUM":"百胜", "MDLZ":"亿滋",
+    "TJX":"TJX", "ROST":"Ross", "ORLY":"O'Reilly", "AZO":"AutoZone", "TSCO":"Tractor Supply",
+    "ISRG":"直觉外科", "MDT":"美敦力", "BSX":"波士顿科学", "SYK":"史赛克", "ZTS":"硕腾",
+    "BRK.B":"伯克希尔", "ALL":"好事达", "MET":"大都会", "PRU":"保德信",
+    "CARR":"开利", "OTIS":"奥的斯", "PWR":"Quanta", "CMI":"康明斯", "ITW":"伊利诺伊工具",
+    "DAL":"达美航空", "UAL":"美联航", "LUV":"西南航空",
+    "ENPH":"Enphase", "FSLR":"First Solar", "NEE":"新纪元能源",
+    "EA":"艺电", "TTWO":"Take-Two", "ROKU":"Roku",
+    "FDX":"联邦快递", "UPS":"UPS",
+    "TMUS":"T-Mobile",
+    "HOOD":"Robinhood", "SOFI":"SoFi", "AFRM":"Affirm",
+    "BILI":"哔哩哔哩", "TCOM":"携程",
+    "SONY":"索尼", "CVS":"西维斯",
+    "VTI":"全市场ETF", "TLT":"国债ETF", "GLD":"黄金ETF", "SLV":"白银ETF", "KWEB":"中概ETF",
 }
 
 
