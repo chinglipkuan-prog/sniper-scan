@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SniperScan</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #050508;
+    font-family: 'Noto Sans SC', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.splash-container {
+    position: relative;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 40%, rgba(180,120,40,0.06) 0%, transparent 60%);
+}
+
+/* ===== Logo ===== */
+.logo-wrapper {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin-bottom: 28px;
+}
+
+/* Outer ring — rotating */
+.logo-ring {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100px; height: 100px;
+    border: 2px solid transparent;
+    border-top: 2px solid rgba(255, 200, 50, 0.6);
+    border-right: 2px solid rgba(255, 200, 50, 0.2);
+    border-radius: 50%;
+    animation: ring-spin 2.5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+}
+
+.logo-ring-inner {
+    position: absolute;
+    top: 12px; left: 12px;
+    width: 76px; height: 76px;
+    border: 1.5px solid transparent;
+    border-bottom: 1.5px solid rgba(212, 175, 55, 0.3);
+    border-left: 1.5px solid rgba(212, 175, 55, 0.15);
+    border-radius: 50%;
+    animation: ring-spin-reverse 2s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+}
+
+@keyframes ring-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@keyframes ring-spin-reverse {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
+}
+
+/* S letter */
+.logo-s {
+    position: absolute;
+    top: 13px; left: 13px;
+    width: 74px; height: 74px;
+    background: linear-gradient(135deg, #FFD700, #D4A017, #FF8C00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 52px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: s-glow 2s ease-in-out infinite alternate;
+    text-shadow: none;
+    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.4));
+}
+
+@keyframes s-glow {
+    0% { filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.3)); }
+    100% { filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.7)); }
+}
+
+/* Scattered light dots */
+.light-dot {
+    position: absolute;
+    width: 3px; height: 3px;
+    background: rgba(255, 215, 0, 0.6);
+    border-radius: 50%;
+    animation: dot-float 3s ease-in-out infinite;
+}
+.light-dot:nth-child(1) { top: -5px; left: 50%; animation-delay: 0s; }
+.light-dot:nth-child(2) { top: 50%; right: -5px; animation-delay: 0.5s; }
+.light-dot:nth-child(3) { bottom: -5px; left: 50%; animation-delay: 1s; }
+.light-dot:nth-child(4) { top: 50%; left: -5px; animation-delay: 1.5s; }
+
+@keyframes dot-float {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.8); box-shadow: 0 0 6px rgba(255, 215, 0, 0.8); }
+}
+
+/* ===== Crosshair (sniper scope) ===== */
+.crosshair-container {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 180px; height: 180px;
+    z-index: -1;
+}
+
+.crosshair-container svg {
+    width: 100%; height: 100%;
+}
+
+.crosshair-thin {
+    stroke: rgba(255, 200, 50, 0.08);
+    stroke-width: 0.5;
+    fill: none;
+}
+
+.crosshair-thick {
+    stroke: rgba(255, 200, 50, 0.15);
+    stroke-width: 1;
+    fill: none;
+}
+
+.crosshair-dot {
+    fill: rgba(255, 200, 50, 0.3);
+}
+
+/* Scanning line — moves across */
+.scan-line {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 200, 50, 0.4), rgba(255, 180, 0, 0.6), transparent);
+    filter: blur(1px);
+    animation: scan-move 3s ease-in-out infinite;
+    opacity: 0;
+}
+
+@keyframes scan-move {
+    0% { top: 0; opacity: 0; }
+    10% { opacity: 1; }
+    45% { top: 100%; opacity: 1; }
+    55% { top: 100%; opacity: 0; }
+    56% { top: 0; opacity: 0; }
+    70% { opacity: 0; }
+}
+
+/* ===== Title ===== */
+.title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #D4A017 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.3));
+    animation: title-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes title-glow {
+    0% { filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.2)); }
+    100% { filter: drop-shadow(0 0 35px rgba(255, 215, 0, 0.5)); }
+}
+
+.subtitle {
+    font-size: 11px;
+    color: rgba(255, 215, 0, 0.35);
+    letter-spacing: 8px;
+    font-family: 'Orbitron', sans-serif;
+    margin-bottom: 40px;
+    font-weight: 300;
+}
+
+/* ===== Loading bar ===== */
+.loading-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.loading-bar-track {
+    width: 160px;
+    height: 2px;
+    background: rgba(255, 215, 0, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.loading-bar-fill {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.3), #FFD700, rgba(255, 215, 0, 0.3));
+    border-radius: 2px;
+    animation: bar-fill 2.5s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+@keyframes bar-fill {
+    0% { width: 0; margin-left: 0; }
+    50% { width: 70%; margin-left: 30%; }
+    100% { width: 0; margin-left: 100%; }
+}
+
+.loading-text {
+    font-size: 10px;
+    color: rgba(255, 215, 0, 0.25);
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 4px;
+    animation: text-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes text-pulse {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.6; }
+}
+
+/* ===== Decorative corner elements ===== */
+.corner {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: rgba(255, 200, 50, 0.1);
+    border-style: solid;
+}
+
+.corner-tl { top: 30px; left: 30px; border-width: 1px 0 0 1px; }
+.corner-tr { top: 30px; right: 30px; border-width: 1px 1px 0 0; }
+.corner-bl { bottom: 30px; left: 30px; border-width: 0 0 1px 1px; }
+.corner-br { bottom: 30px; right: 30px; border-width: 0 1px 1px 0; }
+
+/* ===== Version text ===== */
+.version-text {
+    position: absolute;
+    bottom: 40px;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.08);
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 3px;
+}
+</style>
+</head>
+<body>
+<div class="splash-container">
+
+    <!-- Corner decorations -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- Crosshair (background) -->
+    <div class="crosshair-container">
+        <svg viewBox="0 0 180 180">
+            <!-- Outer circle -->
+            <circle cx="90" cy="90" r="80" class="crosshair-thin"/>
+            <circle cx="90" cy="90" r="65" class="crosshair-thick"/>
+            <circle cx="90" cy="90" r="50" class="crosshair-thin"/>
+            <circle cx="90" cy="90" r="35" class="crosshair-thick"/>
+            <!-- Cross lines -->
+            <line x1="90" y1="5" x2="90" y2="175" class="crosshair-thin"/>
+            <line x1="5" y1="90" x2="175" y2="90" class="crosshair-thin"/>
+            <!-- Center dot -->
+            <circle cx="90" cy="90" r="2" class="crosshair-dot"/>
+            <!-- Tick marks -->
+            <line x1="90" y1="10" x2="90" y2="18" class="crosshair-thick"/>
+            <line x1="90" y1="162" x2="90" y2="170" class="crosshair-thick"/>
+            <line x1="10" y1="90" x2="18" y2="90" class="crosshair-thick"/>
+            <line x1="162" y1="90" x2="170" y2="90" class="crosshair-thick"/>
+        </svg>
+    </div>
+
+    <!-- Scan line -->
+    <div class="scan-line"></div>
+
+    <!-- Logo -->
+    <div class="logo-wrapper">
+        <div class="logo-ring"></div>
+        <div class="logo-ring-inner"></div>
+        <div class="logo-s">S</div>
+        <div class="light-dot"></div>
+        <div class="light-dot"></div>
+        <div class="light-dot"></div>
+        <div class="light-dot"></div>
+    </div>
+
+    <!-- Title -->
+    <div class="title">SNIPER SCAN</div>
+    <div class="subtitle">REAL-TIME EQUITY SCANNER</div>
+
+    <!-- Loading -->
+    <div class="loading-section">
+        <div class="loading-bar-track">
+            <div class="loading-bar-fill"></div>
+        </div>
+        <div class="loading-text">LOADING</div>
+    </div>
+
+    <div class="version-text">v1.0</div>
+
+</div>
+
+<script>
+// Wait for animation to play, then navigate to main app
+setTimeout(() => {
+    window.location.href = 'https://sniper-scan.onrender.com';
+}, 2800);
+</script>
+</body>
+</html>

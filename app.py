@@ -138,6 +138,14 @@ async def api_universe():
     return {"stocks": stocks}
 
 
+@app.get("/splash", response_class=HTMLResponse)
+async def splash():
+    """启动画面"""
+    html_path = HTML_DIR / "splash.html"
+    if html_path.exists():
+        return HTMLResponse(html_path.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Splash 文件未找到</h1>")
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """主页面"""
