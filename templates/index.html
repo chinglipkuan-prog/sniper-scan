@@ -110,9 +110,207 @@ body {
 @media (max-width: 768px) {
     .modal-content { padding: 16px; }
 }
+
+/* ===== Full-screen Splash Overlay ===== */
+#splashOverlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #050508;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease, transform 0.8s ease;
+}
+#splashOverlay.hidden {
+    opacity: 0;
+    transform: scale(1.05);
+    pointer-events: none;
+}
+#splashOverlay .splash-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+/* Logo */
+.splash-logo {
+    position: relative;
+    width: 80px; height: 80px;
+    margin-bottom: 24px;
+}
+.splash-ring {
+    position: absolute; inset: 0;
+    border: 2px solid transparent;
+    border-top: 2px solid rgba(255,200,50,.5);
+    border-right: 2px solid rgba(255,200,50,.15);
+    border-radius: 50%;
+    animation: splash-spin 2.5s cubic-bezier(.83,0,.17,1) infinite;
+}
+.splash-ring-inner {
+    position: absolute; top: 10px; left: 10px;
+    width: 60px; height: 60px;
+    border: 1.5px solid transparent;
+    border-bottom: 1.5px solid rgba(212,175,55,.25);
+    border-left: 1.5px solid rgba(212,175,55,.1);
+    border-radius: 50%;
+    animation: splash-spin-reverse 2s cubic-bezier(.83,0,.17,1) infinite;
+}
+@keyframes splash-spin { to { transform: rotate(360deg); } }
+@keyframes splash-spin-reverse { to { transform: rotate(-360deg); } }
+.splash-s {
+    position: absolute; top: 8px; left: 8px;
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, #FFD700, #D4A017, #FF8C00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 42px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    filter: drop-shadow(0 0 12px rgba(255,215,0,.3));
+    animation: splash-s-glow 2s ease-in-out infinite alternate;
+}
+@keyframes splash-s-glow {
+    0% { filter: drop-shadow(0 0 8px rgba(255,215,0,.25)); }
+    100% { filter: drop-shadow(0 0 25px rgba(255,215,0,.55)); }
+}
+/* Crosshair bg */
+.splash-crosshair {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 160px; height: 160px;
+    z-index: -1;
+    opacity: .08;
+}
+.splash-crosshair svg { width: 100%; height: 100%; }
+.cross-line { stroke: rgba(255,200,50,.6); stroke-width: .5; fill: none; }
+.cross-circle { stroke: rgba(255,200,50,.4); stroke-width: .5; fill: none; }
+/* Scan line */
+.splash-scan {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,200,50,.3), rgba(255,180,0,.5), transparent);
+    filter: blur(1px);
+    animation: splash-scan-move 3s ease-in-out infinite;
+    opacity: 0;
+}
+@keyframes splash-scan-move {
+    0% { top: 0; opacity: 0; }
+    10% { opacity: 1; }
+    45% { top: 100%; opacity: 1; }
+    55% { top: 100%; opacity: 0; }
+    56% { top: 0; opacity: 0; }
+    70% { opacity: 0; }
+}
+/* Title */
+.splash-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 26px; font-weight: 900;
+    letter-spacing: 5px;
+    background: linear-gradient(135deg,#FFD700 0%,#FFA500 50%,#D4A017 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 15px rgba(255,215,0,.2));
+    animation: splash-title-glow 2s ease-in-out infinite alternate;
+}
+@keyframes splash-title-glow {
+    0% { filter: drop-shadow(0 0 10px rgba(255,215,0,.15)); }
+    100% { filter: drop-shadow(0 0 30px rgba(255,215,0,.4)); }
+}
+.splash-sub {
+    font-size: 10px;
+    color: rgba(255,215,0,.3);
+    letter-spacing: 6px;
+    font-family: 'Orbitron', sans-serif;
+    margin-bottom: 32px;
+    font-weight: 300;
+}
+/* Loading bar */
+.splash-bar-track {
+    width: 140px; height: 2px;
+    background: rgba(255,215,0,.08);
+    border-radius: 2px; overflow: hidden;
+}
+.splash-bar-fill {
+    width: 0; height: 100%;
+    background: linear-gradient(90deg, rgba(255,215,0,.3), #FFD700, rgba(255,215,0,.3));
+    border-radius: 2px;
+    animation: splash-bar 2.5s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(255,215,0,.2);
+}
+@keyframes splash-bar {
+    0% { width: 0; margin-left: 0; }
+    50% { width: 70%; margin-left: 30%; }
+    100% { width: 0; margin-left: 100%; }
+}
+.splash-load-text {
+    font-size: 9px;
+    color: rgba(255,215,0,.2);
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 3px;
+    margin-top: 8px;
+    animation: splash-pulse 1.5s ease-in-out infinite;
+}
+@keyframes splash-pulse {
+    0%,100% { opacity: .2; }
+    50% { opacity: .5; }
+}
+/* Corner decorations */
+.splash-corner {
+    position: fixed;
+    width: 18px; height: 18px;
+    border-color: rgba(255,200,50,.08);
+    border-style: solid;
+    z-index: 10000;
+}
+.splash-corner-tl { top: 24px; left: 24px; border-width: 1px 0 0 1px; }
+.splash-corner-tr { top: 24px; right: 24px; border-width: 1px 1px 0 0; }
+.splash-corner-bl { bottom: 24px; left: 24px; border-width: 0 0 1px 1px; }
+.splash-corner-br { bottom: 24px; right: 24px; border-width: 0 1px 1px 0; }
+.splash-version {
+    position: fixed; bottom: 30px;
+    font-size: 8px; color: rgba(255,255,255,.06);
+    font-family: 'Orbitron', sans-serif; letter-spacing: 2px;
+    z-index: 10000;
+}
 </style>
 </head>
 <body>
+
+<!-- ===== Splash Overlay (shows first, fades out once data loads) ===== -->
+<div id="splashOverlay">
+    <div class="splash-corner splash-corner-tl"></div>
+    <div class="splash-corner splash-corner-tr"></div>
+    <div class="splash-corner splash-corner-bl"></div>
+    <div class="splash-corner splash-corner-br"></div>
+    <div class="splash-version">v1.0</div>
+    <div class="splash-inner">
+        <div class="splash-logo">
+            <div class="splash-ring"></div>
+            <div class="splash-ring-inner"></div>
+            <div class="splash-s">S</div>
+            <div class="splash-crosshair">
+                <svg viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="70" class="cross-circle"/>
+                    <circle cx="80" cy="80" r="55" class="cross-line"/>
+                    <circle cx="80" cy="80" r="40" class="cross-circle"/>
+                    <line x1="80" y1="5" x2="80" y2="155" class="cross-line"/>
+                    <line x1="5" y1="80" x2="155" y2="80" class="cross-line"/>
+                    <line x1="80" y1="10" x2="80" y2="18" class="cross-line"/>
+                    <line x1="80" y1="142" x2="80" y2="150" class="cross-line"/>
+                    <line x1="10" y1="80" x2="18" y2="80" class="cross-line"/>
+                    <line x1="142" y1="80" x2="150" y2="80" class="cross-line"/>
+                </svg>
+            </div>
+            <div class="splash-scan"></div>
+        </div>
+        <div class="splash-title">SNIPER SCAN</div>
+        <div class="splash-sub">REAL-TIME EQUITY SCANNER</div>
+        <div class="splash-bar-track"><div class="splash-bar-fill"></div></div>
+        <div class="splash-load-text">LOADING</div>
+    </div>
+</div>
 
 <!-- Header -->
 <header class="fixed top-0 left-0 right-0 z-30 glass border-b border-slate-800/80 px-4 py-3">
@@ -245,6 +443,12 @@ async function refreshScan(force = true) {
         scanData = data;
         renderBuys(data.buys);
         renderSells(data.sells);
+
+        // Hide splash overlay with smooth fade
+        const splash = document.getElementById('splashOverlay');
+        if (splash) {
+            setTimeout(() => splash.classList.add('hidden'), 600);
+        }
 
         document.getElementById('stockCount').textContent = `已扫描 ${data.total_scanned} 只股票`;
 
