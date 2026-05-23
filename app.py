@@ -3,7 +3,6 @@
 实时扫描美股市场，基于知识库书籍给出前10做多/做空排名
 """
 import sys, os, json, time, asyncio
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -14,7 +13,7 @@ import uvicorn
 
 # 添加项目到路径
 sys.path.insert(0, str(Path(__file__).parent))
-from scanner import compute_indicators, SCAN_UNIVERSE, CN_NAME_MAP, SECTOR_MAP, search_stocks
+from scanner import compute_indicators, SCAN_UNIVERSE, CN_NAME_MAP, SECTOR_MAP, search_stocks, fetch_all_tv
 
 app = FastAPI(title="美股狙击扫描器", version="1.0.0")
 
@@ -35,59 +34,8 @@ HTML_DIR = Path(__file__).parent / "templates"
 
 
 def _run_scan():
-    """执行全市场扫描 — 并行版"""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    results = []
-    total = len(SCAN_UNIVERSE)
-    BATCH = 40
-
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        for i in range(0, total, BATCH):
-            batch = SCAN_UNIVERSE[i:i + BATCH]
-            futures = {pool.submit(compute_indicators, t): t for t in batch}
-            for f in as_completed(futures, timeout=45):
-                try:
-                    r = f.result(timeout=5)
-                    if r:
-                        results.append(r)
-                except Exception:
-                    pass
-            time.sleep(0.3)
-
-    # 分类排名
-    buys_all = sorted([r for r in results if r["direction"] == "buy"],
-                      key=lambda x: x["bullish_score"], reverse=True)
-    sells_all = sorted([r for r in results if r["direction"] == "sell"],
-                       key=lambda x: x["bearish_score"], reverse=True)
-
-    # 去重：同一只股票不会同时出现在做多和做空里
-    # 但如果一只票做多和做空分差 < 15，两边都列但降低排名
-    buys_filtered = []
-    for b in buys_all:
-        dup_sell = [s for s in sells_all if s["ticker"] == b["ticker"]]
-        if dup_sell and abs(b["bullish_score"] - dup_sell[0]["bearish_score"]) < 15:
-            # 争议票只列出一次，方向以高分决定
-            if b["bullish_score"] >= dup_sell[0]["bearish_score"]:
-                buys_filtered.append(b)
-            # 否则这个票在 sells 里出现，跳过
-        else:
-            buys_filtered.append(b)
-
-    sells_filtered = []
-    for s in sells_all:
-        dup_buy = [b for b in buys_all if b["ticker"] == s["ticker"]]
-        if dup_buy and abs(s["bearish_score"] - dup_buy[0]["bullish_score"]) < 15:
-            if s["bearish_score"] > dup_buy[0]["bullish_score"]:
-                sells_filtered.append(s)
-        else:
-            sells_filtered.append(s)
-
-    return {
-        "buys": buys_filtered[:10],
-        "sells": sells_filtered[:10],
-        "total_scanned": len(results),
-        "timestamp": datetime.now().isoformat(),
-    }
+    """执行全市场扫描 — TradingView 实时数据"""
+    return fetch_all_tv()
 
 
 @app.get("/api/scan")
