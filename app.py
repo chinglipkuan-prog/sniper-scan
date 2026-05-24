@@ -3,6 +3,7 @@
 实时扫描美股市场，基于知识库书籍给出前10做多/做空排名
 """
 import sys, os, json, time, asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
