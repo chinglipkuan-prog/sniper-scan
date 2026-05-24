@@ -320,10 +320,50 @@ html, body {
 </div>
 
 <script>
-// Wait for animation to play, then navigate to main app
-setTimeout(() => {
-    window.location.href = 'https://sniper-scan.onrender.com';
-}, 2800);
+// 轮询检查 Render 是否就绪，保持 splash 动画直到后端可用
+var RENDER_URL = 'https://sniper-scan.onrender.com';
+var loadingText = document.querySelector('.loading-text');
+var barFill = document.querySelector('.loading-bar-fill');
+var attempt = 0;
+
+function checkHealth() {
+    attempt++;
+    var statusMsg = 'INITIALIZING...';
+    if (attempt > 2) statusMsg = 'CONNECTING.';
+    if (attempt > 5) statusMsg = 'CONNECTING..';
+    if (attempt > 8) statusMsg = 'CONNECTING...';
+    if (attempt > 12) statusMsg = 'STILL LOADING';
+    if (attempt > 18) statusMsg = 'PLEASE WAIT';
+    loadingText.textContent = statusMsg;
+
+    var xhr = new XMLHttpRequest();
+    xhr.timeout = 8000;
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            loadingText.textContent = 'READY ✓';
+            // 播放完成动画后跳转
+            setTimeout(function() {
+                window.location.href = RENDER_URL;
+            }, 500);
+        } else {
+            retry();
+        }
+    };
+    xhr.onerror = retry;
+    xhr.ontimeout = retry;
+    xhr.open('GET', RENDER_URL + '/health', true);
+    xhr.send();
+}
+
+function retry() {
+    if (attempt > 30) {
+        loadingText.textContent = 'RETRYING...';
+    }
+    setTimeout(checkHealth, 3000);
+}
+
+// 先展示动画2秒再开始检查
+setTimeout(checkHealth, 2000);
 </script>
 </body>
 </html>
