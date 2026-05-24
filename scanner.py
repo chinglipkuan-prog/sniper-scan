@@ -376,49 +376,127 @@ def compute_indicators(ticker_str: str) -> dict:
 
 
 def fetch_all_tv() -> dict:
-    """通过 TradingView 获取全市场数据并评分"""
-    import subprocess, json, os
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    js_script = os.path.join(script_dir, "tv_scanner.js")
-    tickers_json = json.dumps(SCAN_UNIVERSE)
+    """
+    全量扫描：TradingView WebSocket 实时行情 + yfinance 批量历史数据
+    纯Python，无需Node.js，无限速
 
-    proc = subprocess.run(
-        ["node", js_script, tickers_json],
-        capture_output=True, text=True, timeout=180,
-        cwd=script_dir
-    )
+    策略：
+    1. yfinance.download() 大批量获取历史OHLCV（~15秒）
+    2. TradingView WebSocket 获取实时价、涨跌幅（~10-15秒）
+    3. 合并数据并使用现有评分引擎
+    """
+    import json
 
-    if proc.returncode != 0:
-        raise RuntimeError(f"tv_scanner.js failed: {proc.stderr[:200]}")
-
-    raw = json.loads(proc.stdout)
+    all_tickers = SCAN_UNIVERSE
     results = []
+    ok_count = 0
 
-    for item in raw:
+    # ---- Step 1: yfinance 批量下载历史数据 ----
+    hist_data = {}
+    try:
+        batch = yf.download(all_tickers, period="2mo", progress=False, group_by="ticker")
+        if batch is not None and not batch.empty:
+            if isinstance(batch.columns, pd.MultiIndex):
+                for t in batch.columns.get_level_values(0).unique():
+                    try:
+                        td = batch[t]
+                        close = td.get("Close", pd.Series(dtype=float)).dropna().astype(float)
+                        if len(close) < 5:
+                            continue
+                        high = td.get("High", pd.Series(dtype=float)).dropna().astype(float)
+                        low = td.get("Low", pd.Series(dtype=float)).dropna().astype(float)
+                        vol = td.get("Volume", pd.Series(dtype=float)).dropna().astype(float)
+                        hist_data[t] = {"close": close, "high": high, "low": low, "volume": vol}
+                    except Exception:
+                        continue
+    except Exception as e:
+        print(f"  yfinance: {e}")
+
+    # ---- Step 2: TradingView WebSocket 实时行情 ----
+    realtime = {}
+    try:
+        from tv_ws_client import fetch_realtime_prices
+        realtime = fetch_realtime_prices(all_tickers, timeout=25)
+    except Exception as e:
+        print(f"  WebSocket: {e}")
+
+    # ---- Step 3: 合并数据并评分 ----
+    for tkr in all_tickers:
         try:
-            ticker = item["ticker"]
-            last_price = item["last_price"]
-            prev_close = item["prev_close"]
-            open_price = item["open"]
-            volume = item["volume"]
+            rt = realtime.get(tkr)
+            if not rt:
+                continue
 
-            # 从K线数据构建 pandas Series
-            hist_close = pd.Series(item["hist_close"], dtype=float)
-            hist_high = pd.Series(item["hist_high"], dtype=float)
-            hist_low = pd.Series(item["hist_low"], dtype=float)
-            hist_volume = pd.Series(item["hist_volume"], dtype=float)
+            last_price = rt["price"]
+            change_pct = rt["change_pct"]
+            change = rt["change"]
+            volume = rt["volume"]
 
-            r = score_from_data(
-                ticker, last_price, prev_close, open_price, volume,
-                hist_close, hist_high, hist_low, hist_volume,
-            )
+            if not last_price or last_price <= 0:
+                continue
+
+            prev_close = last_price - (last_price * change_pct / 100) if change_pct else last_price * 0.995
+            open_price = prev_close
+
+            hist = hist_data.get(tkr)
+            if hist:
+                close_s = hist["close"].copy()
+                if len(close_s) >= 2:
+                    close_s.iloc[-1] = last_price
+                r = score_from_data(
+                    tkr, last_price, prev_close, open_price, volume,
+                    close_s, hist["high"], hist["low"], hist["volume"],
+                )
+            else:
+                sector = SECTOR_MAP.get(tkr, "其他")
+                cn_name = CN_NAME_MAP.get(tkr, tkr)
+                ma20_val = last_price
+                rsi_val = 50.0
+
+                bullish = []
+                bearish = []
+                details_b = []
+
+                if change_pct > 1.0:
+                    bullish.append("实时上涨")
+                    details_b.append({"signal": "🔥 实时上涨", "reason": f"实时涨幅{change_pct:+.1f}%动能强劲"})
+                if change_pct < -1.0:
+                    bearish.append("实时下跌")
+                    details_b.append({"signal": "💧 实时下跌", "reason": f"实时跌幅{change_pct:+.1f}%动能弱势"})
+
+                bscore = min(len(bullish) * 10 + 50, 100)
+                bscore2 = min(len(bearish) * 10 + 50, 100)
+                if change_pct > 2: bscore = min(bscore * 1.15, 100)
+                if change_pct < -2: bscore2 = min(bscore2 * 1.15, 100)
+
+                r = {
+                    "ticker": tkr, "name": cn_name, "sector": sector,
+                    "price": round(last_price, 2), "change": round(change, 2),
+                    "change_pct": round(change_pct, 2), "volume": int(volume),
+                    "market_cap": 0, "ma5": 0, "ma10": 0,
+                    "ma20": round(ma20_val, 2), "ma50": 0, "ma200": None,
+                    "boll_up": round(last_price * 1.05, 2), "boll_mid": round(last_price, 2),
+                    "boll_dn": round(last_price * 0.95, 2), "boll_pos": 0.5,
+                    "rsi": round(rsi_val, 1), "macd": 0, "macd_signal": 0,
+                    "macd_bullish": False, "macd_cross": "holding",
+                    "vol_ratio": 1.0, "vol_trend": "正常",
+                    "avg_vol_20": int(volume), "ma20_deviation": 0,
+                    "pos_52w": 0.5, "high_52w": None, "low_52w": None,
+                    "candle_pattern": "normal",
+                    "bullish_score": int(bscore), "bearish_score": int(bscore2),
+                    "direction": "buy" if bscore >= bscore2 else "sell",
+                    "bullish_signals": bullish, "bearish_signals": bearish,
+                    "details": details_b,
+                    "analysis_time": datetime.now().isoformat(),
+                    "data_source": "tradingview_ws",
+                }
+
             if r:
                 results.append(r)
+                ok_count += 1
         except Exception as e:
-            print(f"Score error {item.get('ticker','?')}: {e}")
             continue
 
-    # 排名
     buys = sorted([r for r in results if r["direction"] == "buy"],
                   key=lambda x: x["bullish_score"], reverse=True)[:10]
     sells = sorted([r for r in results if r["direction"] == "sell"],
@@ -430,7 +508,7 @@ def fetch_all_tv() -> dict:
         "total_scanned": len(results),
         "total_universe": len(SCAN_UNIVERSE),
         "timestamp": datetime.now().isoformat(),
-        "data_source": "tradingview",
+        "data_source": "tradingview_ws",
     }
 
 
