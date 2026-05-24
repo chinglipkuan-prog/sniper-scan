@@ -391,46 +391,52 @@ def fetch_all_tv() -> dict:
     results = []
     ok_count = 0
 
-    # ---- Step 1: yfinance 批量下载历史数据 ----
+    # ---- Step 1: yfinance 批量历史数据 ----
+    # 分批下载避免 Rendder 512MB OOM
     hist_data = {}
-    try:
-        batch = yf.download(all_tickers, period="2mo", progress=False, group_by="ticker")
-        if batch is not None and not batch.empty:
-            if isinstance(batch.columns, pd.MultiIndex):
-                for t in batch.columns.get_level_values(0).unique():
-                    try:
-                        td = batch[t]
-                        close = td.get("Close", pd.Series(dtype=float)).dropna().astype(float)
-                        if len(close) < 5:
+    batch_size = 30
+    for i in range(0, len(all_tickers), batch_size):
+        batch = all_tickers[i:i + batch_size]
+        try:
+            b = yf.download(batch, period="1mo", progress=False, group_by="ticker")
+            if b is not None and not b.empty:
+                if isinstance(b.columns, pd.MultiIndex):
+                    for t in b.columns.get_level_values(0).unique():
+                        try:
+                            td = b[t]
+                            close = td.get("Close", pd.Series(dtype=float)).dropna().astype(float)
+                            if len(close) < 5:
+                                continue
+                            high = td.get("High", pd.Series(dtype=float)).dropna().astype(float)
+                            low = td.get("Low", pd.Series(dtype=float)).dropna().astype(float)
+                            vol = td.get("Volume", pd.Series(dtype=float)).dropna().astype(float)
+                            hist_data[t] = {"close": close, "high": high, "low": low, "volume": vol}
+                        except Exception:
                             continue
-                        high = td.get("High", pd.Series(dtype=float)).dropna().astype(float)
-                        low = td.get("Low", pd.Series(dtype=float)).dropna().astype(float)
-                        vol = td.get("Volume", pd.Series(dtype=float)).dropna().astype(float)
-                        hist_data[t] = {"close": close, "high": high, "low": low, "volume": vol}
-                    except Exception:
-                        continue
-    except Exception as e:
-        print(f"  yfinance: {e}")
+            print(f"  历史批次 {i//batch_size+1}/{(len(all_tickers)+batch_size-1)//batch_size}: {len(batch)}只 → {len([t for t in batch if t in hist_data])}成功")
+        except Exception as e:
+            print(f"  批次 {i//batch_size+1} 失败: {e}")
+    print(f"  历史总计: {len(hist_data)}/{len(all_tickers)}")
 
     # ---- Step 2: 实时行情 ----
-    # 策略: HTTP (Yahoo实时API, ~30s/181只) 优先, WebSocket 备份
+    # 策略: HTTP 并行抓取 (快且稳定, 180只~12s) 优先, WebSocket 补漏
     realtime = {}
     try:
         from tv_ws_client import fetch_realtime_prices, fetch_realtime_http
-        # HTTP 并行抓取 — 快且稳定
-        realtime = fetch_realtime_http(all_tickers, timeout=30)
+        # HTTP 并行抓取全量 — 更高worker数, 更大超时
+        http_timeout = max(30, min(60, len(all_tickers) * 1.5))
+        realtime = fetch_realtime_http(all_tickers, timeout=http_timeout)
         print(f"  HTTP 实时: {len(realtime)}/{len(all_tickers)}")
     except Exception as e:
         print(f"  HTTP failed: {e}")
 
-    # 如果 HTTP 结果太少 (>50% 缺失), 尝试 WebSocket 补漏
-    ws_supplement = {}
-    if len(realtime) < len(all_tickers) * 0.5:
+    # WS 补漏 — 只查 HTTP 没覆盖到的
+    if len(realtime) < len(all_tickers) * 0.85:
         missing = [t for t in all_tickers if t not in realtime]
-        if missing and len(missing) > 10:
+        if missing:
             try:
-                ws_supplement = fetch_realtime_prices(missing, timeout=20)
-                print(f"  WS 补充: {len(ws_supplement)}/{len(missing)} missing stocks")
+                ws_supplement = fetch_realtime_prices(missing, timeout=25)
+                print(f"  WS 补充: {len(ws_supplement)}/{len(missing)}")
                 realtime.update(ws_supplement)
             except Exception as e:
                 print(f"  WS supplement: {e}")

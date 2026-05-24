@@ -156,12 +156,14 @@ def fetch_realtime_prices(tickers: list, timeout: float = 30.0) -> dict:
     return out
 
 
-def fetch_realtime_http(tickers: list, timeout: float = 15.0) -> dict:
-    """HTTP 实时行情备份 — Yahoo Finance 实时报价
-    当 WebSocket 不可用时使用
+def fetch_realtime_http(tickers: list, timeout: float = 30.0) -> dict:
+    """HTTP 实时行情 — Yahoo Finance 实时报价
+    并行抓取，速度快、覆盖广、无外部依赖
     """
     import concurrent.futures
     out = {}
+    # 根据池大小动态调整 — 大池用更多worker
+    workers = min(40, max(20, len(tickers) // 5))
 
     def _fetch_one(tkr):
         try:
@@ -170,10 +172,12 @@ def fetch_realtime_http(tickers: list, timeout: float = 15.0) -> dict:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
             req = urllib.request.Request(url, headers={
-                "User-Agent": "Mozilla/5.0",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
                 "Accept": "application/json",
             })
-            resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+            # 每次请求独立超时 = total_timeout / 批次
+            req_timeout = max(8, min(20, timeout / (len(tickers) / workers + 1)))
+            resp = urllib.request.urlopen(req, timeout=req_timeout, context=ctx)
             data = json.loads(resp.read().decode())
             ch = data.get("chart", {}).get("result", [])
             if not ch:
@@ -184,7 +188,6 @@ def fetch_realtime_http(tickers: list, timeout: float = 15.0) -> dict:
                 return None
             q = indic[0]
             closes = q.get("close", [])
-            opens = q.get("open", [])
             vols = q.get("volume", [])
             if not closes or not closes[-1]:
                 return None
@@ -203,7 +206,7 @@ def fetch_realtime_http(tickers: list, timeout: float = 15.0) -> dict:
             return None
 
     clean = list(set(tickers))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         fut_map = {pool.submit(_fetch_one, t): t for t in clean}
         for fut in concurrent.futures.as_completed(fut_map, timeout=timeout):
             t = fut_map[fut]
