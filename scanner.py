@@ -391,32 +391,11 @@ def fetch_all_tv() -> dict:
     results = []
     ok_count = 0
 
-    # ---- Step 1: yfinance 批量历史数据 ----
-    # 分批下载避免 Rendder 512MB OOM
+    # ---- Step 1: 轻量扫描（无 yfinance 历史，单项分析补全） ----
+    # 快速模式：仅用实时数据评分，确保 30s 内返回
+    # 详细技术分析在点击单只股票时提供
     hist_data = {}
-    batch_size = 30
-    for i in range(0, len(all_tickers), batch_size):
-        batch = all_tickers[i:i + batch_size]
-        try:
-            b = yf.download(batch, period="1mo", progress=False, group_by="ticker")
-            if b is not None and not b.empty:
-                if isinstance(b.columns, pd.MultiIndex):
-                    for t in b.columns.get_level_values(0).unique():
-                        try:
-                            td = b[t]
-                            close = td.get("Close", pd.Series(dtype=float)).dropna().astype(float)
-                            if len(close) < 5:
-                                continue
-                            high = td.get("High", pd.Series(dtype=float)).dropna().astype(float)
-                            low = td.get("Low", pd.Series(dtype=float)).dropna().astype(float)
-                            vol = td.get("Volume", pd.Series(dtype=float)).dropna().astype(float)
-                            hist_data[t] = {"close": close, "high": high, "low": low, "volume": vol}
-                        except Exception:
-                            continue
-            print(f"  历史批次 {i//batch_size+1}/{(len(all_tickers)+batch_size-1)//batch_size}: {len(batch)}只 → {len([t for t in batch if t in hist_data])}成功")
-        except Exception as e:
-            print(f"  批次 {i//batch_size+1} 失败: {e}")
-    print(f"  历史总计: {len(hist_data)}/{len(all_tickers)}")
+    print(f"  快速模式: 跳过历史批量下载")
 
     # ---- Step 2: 实时行情 ----
     # 策略: HTTP 并行抓取 (快且稳定, 180只~12s) 优先, WebSocket 补漏
