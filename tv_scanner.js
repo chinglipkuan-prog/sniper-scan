@@ -31,7 +31,7 @@ try {
 if (!tickers.length) { console.error('Empty tickers'); process.exit(1); }
 
 const MAX_CONCURRENT = 8;
-const TIMEOUT_MS = 20000;
+const TIMEOUT_MS = 15000;
 
 // 搜索缓存
 const exchangeCache = {};

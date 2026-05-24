@@ -384,7 +384,7 @@ def fetch_all_tv() -> dict:
 
     proc = subprocess.run(
         ["node", js_script, tickers_json],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True, text=True, timeout=180,
         cwd=script_dir
     )
 
