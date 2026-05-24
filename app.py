@@ -109,6 +109,44 @@ async def health():
     return {"status": "ok", "version": "1.0.0", "time": datetime.now().isoformat()}
 
 
+@app.get("/api/diag")
+async def api_diag():
+    """诊断端点 — 测试数据源连通性"""
+    from tv_ws_client import fetch_realtime_prices, fetch_realtime_http
+    import time
+    diag = {"timestamp": datetime.now().isoformat()}
+
+    # 测试 WebSocket
+    test_tickers = ["AAPL", "MSFT", "TSLA", "GOOGL", "AMZN"]
+    try:
+        t0 = time.time()
+        ws_data = fetch_realtime_prices(test_tickers, timeout=10)
+        ws_time = time.time() - t0
+        diag["ws_status"] = "ok" if len(ws_data) >= 2 else "partial"
+        diag["ws_count"] = len(ws_data)
+        diag["ws_time"] = round(ws_time, 2)
+        diag["ws_sample"] = ws_data
+    except Exception as e:
+        diag["ws_status"] = "error"
+        diag["ws_error"] = str(e)
+
+    # 测试 HTTP 备份
+    try:
+        t0 = time.time()
+        http_data = fetch_realtime_http(test_tickers, timeout=10)
+        http_time = time.time() - t0
+        diag["http_status"] = "ok" if len(http_data) >= 2 else "partial"
+        diag["http_count"] = len(http_data)
+        diag["http_time"] = round(http_time, 2)
+        diag["http_sample"] = http_data
+    except Exception as e:
+        diag["http_status"] = "error"
+        diag["http_error"] = str(e)
+
+    diag["universe_count"] = len(SCAN_UNIVERSE)
+    return diag
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

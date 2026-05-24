@@ -13,9 +13,17 @@ import time
 import re
 import string
 import random
-from websocket import create_connection
+import urllib.request
+import ssl
+try:
+    from websocket import create_connection
+    HAS_WS = True
+except ImportError:
+    HAS_WS = False
 
 WS_URL = "wss://data.tradingview.com/socket.io/websocket"
+# HTTP fallback URL for real-time quotes
+YAHOO_REALTIME_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
 
 _NYSE = {
     "JPM", "BAC", "GS", "MS", "V", "MA", "AXP", "KO", "PEP",
@@ -145,4 +153,64 @@ def fetch_realtime_prices(tickers: list, timeout: float = 30.0) -> dict:
     for full, orig in sym_map.items():
         if full in results:
             out[orig] = results[full]
+    return out
+
+
+def fetch_realtime_http(tickers: list, timeout: float = 15.0) -> dict:
+    """HTTP 实时行情备份 — Yahoo Finance 实时报价
+    当 WebSocket 不可用时使用
+    """
+    import concurrent.futures
+    out = {}
+
+    def _fetch_one(tkr):
+        try:
+            url = YAHOO_REALTIME_URL.format(ticker=tkr)
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+            })
+            resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+            data = json.loads(resp.read().decode())
+            ch = data.get("chart", {}).get("result", [])
+            if not ch:
+                return None
+            meta = ch[0].get("meta", {})
+            indic = ch[0].get("indicators", {}).get("quote", [{}])
+            if not indic:
+                return None
+            q = indic[0]
+            closes = q.get("close", [])
+            opens = q.get("open", [])
+            vols = q.get("volume", [])
+            if not closes or not closes[-1]:
+                return None
+            price = float(closes[-1])
+            prev_close = float(meta.get("chartPreviousClose", 0) or meta.get("previousClose", price))
+            change = price - prev_close
+            change_pct = (change / prev_close) * 100 if prev_close else 0
+            volume = int(vols[-1]) if vols and vols[-1] else 0
+            return {
+                "price": price,
+                "change_pct": round(change_pct, 2),
+                "change": round(change, 2),
+                "volume": volume,
+            }
+        except Exception:
+            return None
+
+    clean = list(set(tickers))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+        fut_map = {pool.submit(_fetch_one, t): t for t in clean}
+        for fut in concurrent.futures.as_completed(fut_map, timeout=timeout):
+            t = fut_map[fut]
+            try:
+                r = fut.result()
+                if r:
+                    out[t] = r
+            except Exception:
+                continue
     return out

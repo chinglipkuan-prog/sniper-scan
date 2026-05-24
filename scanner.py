@@ -412,13 +412,28 @@ def fetch_all_tv() -> dict:
     except Exception as e:
         print(f"  yfinance: {e}")
 
-    # ---- Step 2: TradingView WebSocket 实时行情 ----
+    # ---- Step 2: 实时行情 ----
+    # 策略: HTTP (Yahoo实时API, ~30s/181只) 优先, WebSocket 备份
     realtime = {}
     try:
-        from tv_ws_client import fetch_realtime_prices
-        realtime = fetch_realtime_prices(all_tickers, timeout=25)
+        from tv_ws_client import fetch_realtime_prices, fetch_realtime_http
+        # HTTP 并行抓取 — 快且稳定
+        realtime = fetch_realtime_http(all_tickers, timeout=30)
+        print(f"  HTTP 实时: {len(realtime)}/{len(all_tickers)}")
     except Exception as e:
-        print(f"  WebSocket: {e}")
+        print(f"  HTTP failed: {e}")
+
+    # 如果 HTTP 结果太少 (>50% 缺失), 尝试 WebSocket 补漏
+    ws_supplement = {}
+    if len(realtime) < len(all_tickers) * 0.5:
+        missing = [t for t in all_tickers if t not in realtime]
+        if missing and len(missing) > 10:
+            try:
+                ws_supplement = fetch_realtime_prices(missing, timeout=20)
+                print(f"  WS 补充: {len(ws_supplement)}/{len(missing)} missing stocks")
+                realtime.update(ws_supplement)
+            except Exception as e:
+                print(f"  WS supplement: {e}")
 
     # ---- Step 3: 合并数据并评分 ----
     for tkr in all_tickers:
